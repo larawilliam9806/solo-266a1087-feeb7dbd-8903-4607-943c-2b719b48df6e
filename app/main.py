@@ -13,6 +13,8 @@ from .database import connect, init_db, write_transaction
 from .schemas import (
     CalibrationIn,
     CalibrationOut,
+    CorrectionIn,
+    CorrectionOut,
     HourlyRangeOut,
     HourlyResultOut,
     MessageOut,
@@ -178,6 +180,42 @@ def get_calibrations(
     if not include_withdrawn:
         rows = [r for r in rows if not r["withdrawn"]]
     return [CalibrationOut(**r) for r in rows]
+
+
+# --------------------------------------------------------------------------- #
+# 主表通道接反更正
+# --------------------------------------------------------------------------- #
+@app.put(
+    "/corrections/{number}",
+    response_model=CorrectionOut,
+    tags=["更正"],
+    responses={
+        409: {"model": MessageOut, "description": "同号内容不同，或同一测点更正时段重叠"},
+        400: {"model": MessageOut, "description": "区间 / 测点不合法"},
+    },
+)
+def put_correction(
+    number: str, payload: CorrectionIn, conn=Depends(get_conn)
+) -> CorrectionOut:
+    try:
+        with write_transaction(conn):
+            body, _created = services.register_correction(conn, number, payload)
+        return CorrectionOut(**body)
+    except (services.ServiceError, TimeFormatError) as exc:
+        raise _service_error(exc)
+    except OperationalError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"数据库暂时不可写，请重试: {exc}",
+        )
+
+
+@app.get("/corrections", response_model=list[CorrectionOut], tags=["更正"])
+def get_corrections(
+    point: str | None = Query(default=None, description="按测点过滤（匹配更正任一端）"),
+    conn=Depends(get_conn),
+) -> list[CorrectionOut]:
+    return [CorrectionOut(**row) for row in services.list_corrections(conn, point)]
 
 
 # --------------------------------------------------------------------------- #

@@ -61,6 +61,24 @@ CREATE TABLE IF NOT EXISTS hourly_results (
     updated_at      INTEGER NOT NULL,
     PRIMARY KEY (point, hour_start)
 );
+
+-- 主表通道接反更正：区间内两个测点的主表读数互换归属。
+-- 测点对无方向，point_a / point_b 按字典序归一化存储。
+CREATE TABLE IF NOT EXISTS corrections (
+    id          INTEGER PRIMARY KEY,
+    number      TEXT NOT NULL UNIQUE,
+    point_a     TEXT NOT NULL,
+    point_b     TEXT NOT NULL,
+    start_ts    INTEGER NOT NULL,
+    end_ts      INTEGER NOT NULL,
+    created_at  INTEGER NOT NULL
+);
+
+-- 同一测点的更正时段互不重叠（相邻允许），按任一端测点检索做排他检查与换归属。
+CREATE INDEX IF NOT EXISTS idx_corrections_point_a
+    ON corrections(point_a, start_ts, end_ts);
+CREATE INDEX IF NOT EXISTS idx_corrections_point_b
+    ON corrections(point_b, start_ts, end_ts);
 """
 
 
