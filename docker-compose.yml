@@ -1,0 +1,21 @@
+services:
+  api:
+    build: .
+    image: noise-monitor-api:latest
+    container_name: noise-monitor-api
+    ports:
+      - "8000:8000"
+    environment:
+      NOISE_DB_PATH: /data/noise.db
+      NOISE_BUSY_TIMEOUT_MS: "10000"
+    volumes:
+      - noise-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  noise-data:
